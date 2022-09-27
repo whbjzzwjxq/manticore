@@ -1,5 +1,6 @@
 from collections import namedtuple
 from typing import Optional
+from unittest import result
 
 from .abi import ABI
 from ..exceptions import EthereumError
@@ -152,3 +153,29 @@ class EVMContract(EVMAccount):
             return f
 
         raise AttributeError(f"The contract {self._name} doesn't have {name} function.")
+
+    def get_signature(self, name: str) -> str:
+        if not self.__initialized:
+            self.__init_hashes()
+        entries = self.__hashes[name]
+        if len(entries) > 1:
+            sig = entries[0].signature[len(name) :]
+            raise EthereumError(
+                f"Function: `{name}` has multiple signatures but `signature` is not "
+                f'defined! Example: `account.{name}(..., signature="{sig}")`\n'
+                f"Known signatures: {[entry.signature[len(name):] for entry in self.__hashes[name]]}"
+            )
+        result = str(entries[0].signature)
+        if result.startswith(name):
+            result = result.replace(name, "", 1)
+        return result
+
+    def exec_func_totally_symbolical(self, name: str, caller=None, value=0, gas=210000):
+        arg_sign = self.get_signature(name)
+        if arg_sign == "()":
+            self.__getattr__(name)(caller=caller, value=value, gas=gas)
+            return None
+        else:
+            s = self._manticore.make_symbolic_arguments(self.get_signature(name))
+            self.__getattr__(name)(*s, caller=caller, value=value, gas=gas)
+            return s
