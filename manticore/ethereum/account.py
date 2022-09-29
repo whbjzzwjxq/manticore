@@ -170,12 +170,17 @@ class EVMContract(EVMAccount):
             result = result.replace(name, "", 1)
         return result
 
-    def exec_func_totally_symbolical(self, name: str, caller=None, value=0, gas=210000):
+    def exec_func_totally_symbolical(self, name: str, caller=None, value=False, gas=210000):
         arg_sign = self.get_signature(name)
+        value = self._manticore.make_symbolic_value() if value else 0
         if arg_sign == "()":
             self.__getattr__(name)(caller=caller, value=value, gas=gas)
+            if value:
+                return (value,)
             return None
         else:
             s = self._manticore.make_symbolic_arguments(self.get_signature(name))
             self.__getattr__(name)(*s, caller=caller, value=value, gas=gas)
+            if value:
+                s = (*s, value)
             return s
